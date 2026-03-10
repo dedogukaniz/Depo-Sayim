@@ -2,24 +2,24 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Depo Sayım – Canlı OCR</title>
+<title>Depo Sayım – Hızlı Kamera OCR</title>
 
-<!-- Tesseract.js OCR -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 body{font-family:Arial;padding:20px;background:#f5f5f5}
-h2{margin-bottom:20px}
 select,input,button{display:block;margin:10px 0;padding:10px;width:260px;font-size:14px}
-table{border-collapse:collapse;width:100%;margin-top:30px;background:white}
+table{border-collapse:collapse;width:100%;margin-top:20px;background:white}
 td,th{border:1px solid #ccc;padding:8px;text-align:center}
 th{background:#eee}
-#camera{width:100%;max-width:360px;margin-top:20px;border:1px solid #aaa;padding:5px}
+#camera{width:100%;max-width:380px;border:1px solid #999;margin-top:10px}
 </style>
 </head>
+
 <body>
 
-<h2>📦 Depo Sayım Sistemi – Canlı OCR</h2>
+<h2>📦 Depo Sayım Sistemi</h2>
 
 <label>Kullanıcı</label>
 <select id="user">
@@ -34,15 +34,17 @@ th{background:#eee}
 <select id="raf"></select>
 
 <label>Stok Kodu</label>
-<input type="text" id="stokInput" maxlength="10" placeholder="30.01.2121">
+<input type="text" id="stokInput" placeholder="30.01.2121" maxlength="10">
 
 <label>Adet</label>
-<input type="number" id="adetInput" value="1" min="1">
+<input type="number" id="adetInput" value="1">
 
-<button onclick="stokEkle()">Stok Ekle (Manuel)</button>
-<button onclick="excelIndir()">Excel İndir</button>
+<button onclick="stokEkle()">Stok Ekle</button>
+<button onclick="excelIndir()">Excel İndir (.xlsx)</button>
 
-<h3>Kamera – Canlı OCR</h3>
+<button onclick="kameraDegistir()">📷 Kamera Değiştir</button>
+
+<h3>Kamera</h3>
 <video id="camera" autoplay playsinline></video>
 
 <table>
@@ -51,7 +53,7 @@ th{background:#eee}
 <th>Tarih</th>
 <th>Kullanıcı</th>
 <th>Raf</th>
-<th>Stok Kodu</th>
+<th>Stok</th>
 <th>Adet</th>
 </tr>
 </thead>
@@ -59,7 +61,8 @@ th{background:#eee}
 </table>
 
 <script>
-// RAF LİSTESİ
+
+// RAF OLUŞTUR
 const raf=document.getElementById("raf")
 for(let r=1;r<=64;r++){
 for(let s=1;s<=5;s++){
@@ -71,35 +74,43 @@ raf.appendChild(opt)
 }
 
 // VERİ
-let data=[];
+let data=[]
 
-// STOK EKLE (MANUEL VEYA OCR)
-function stokEkle(tarihParam){
+// STOK EKLE
+function stokEkle(){
+
 let stok=document.getElementById("stokInput").value.trim()
 let adet=parseInt(document.getElementById("adetInput").value)
 let user=document.getElementById("user").value
-let raf=document.getElementById("raf").value
-let today = new Date()
-let tarih = tarihParam || today.getDate().toString().padStart(2,'0') + '.' + (today.getMonth()+1).toString().padStart(2,'0') + '.' + today.getFullYear()
-if(!/^\d{2}\.\d{2}\.\d{4}$/.test(stok)){
-alert("Stok formatı 30.01.2121 olmalı")
-return
-}
-let item=data.find(x=>x.stok===stok && x.raf===raf)
-if(item){item.adet+=adet}else{
-data.push({tarih:tarih,user:user,raf:raf,stok:stok,adet:adet})
-}
-updateTable()
-document.getElementById("stokInput").value=""
-document.getElementById("adetInput").value=1
+let rafv=document.getElementById("raf").value
+
+if(!/^\d{2}\.\d{2}\.\d{4}$/.test(stok))return
+
+let today=new Date()
+let tarih=today.toLocaleDateString("tr-TR")
+
+let item=data.find(x=>x.stok==stok && x.raf==rafv)
+
+if(item){
+item.adet+=adet
+}else{
+data.push({tarih,user,raf:rafv,stok,adet})
 }
 
-// TABLO GÜNCELLE
+updateTable()
+
+document.getElementById("stokInput").value=""
+}
+
+// TABLO
 function updateTable(){
+
 let tbody=document.getElementById("table")
 tbody.innerHTML=""
+
 data.forEach(r=>{
-tbody.innerHTML+=`<tr>
+tbody.innerHTML+=`
+<tr>
 <td>${r.tarih}</td>
 <td>${r.user}</td>
 <td>${r.raf}</td>
@@ -107,54 +118,132 @@ tbody.innerHTML+=`<tr>
 <td>${r.adet}</td>
 </tr>`
 })
+
 }
 
-// EXCEL İNDİR
+// XLSX
 function excelIndir(){
-let csv="Tarih;Kullanıcı;Raf;Stok Kodu;Adet\n"
-data.forEach(r=>{
-csv+=`${r.tarih};${r.user};${r.raf};${r.stok};${r.adet}\n`
-})
-let blob=new Blob([csv],{type:"text/csv;charset=utf-8;"})
-let link=document.createElement("a")
-link.href=URL.createObjectURL(blob)
-link.download="depo_sayim.csv"
-link.click()
+
+let ws=XLSX.utils.json_to_sheet(data)
+let wb=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(wb,ws,"Sayim")
+
+XLSX.writeFile(wb,"depo_sayim.xlsx")
+
 }
 
-// OTOMATİK FORMAT
-document.getElementById("stokInput").addEventListener("input",function(){
-let v=this.value.replace(/\D/g,"")
-if(v.length>2)v=v.slice(0,2)+"."+v.slice(2)
-if(v.length>5)v=v.slice(0,5)+"."+v.slice(5)
-this.value=v.slice(0,10)
+// KAMERA
+let video=document.getElementById("camera")
+let currentCamera="environment"
+let stream=null
+
+async function kameraBaslat(){
+
+if(stream){
+stream.getTracks().forEach(t=>t.stop())
+}
+
+stream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:currentCamera}
 })
 
-// KAMERA AYAR
-const video=document.getElementById("camera")
-navigator.mediaDevices.getUserMedia({video:true})
-.then(stream=>{video.srcObject=stream})
-.catch(err=>{alert("Kamera açılamadı: "+err)})
+video.srcObject=stream
 
-// CANLI OCR (her 1 saniye)
+}
+
+function kameraDegistir(){
+
+currentCamera=currentCamera==="environment"?"user":"environment"
+kameraBaslat()
+
+}
+
+kameraBaslat()
+
+// OCR WORKER (HIZLI)
+let worker=null
+
+async function ocrInit(){
+worker=await Tesseract.createWorker()
+await worker.loadLanguage('eng')
+await worker.initialize('eng')
+}
+
+ocrInit()
+
+// BARKOD DETECTOR
+let barcodeDetector=null
+
+if('BarcodeDetector' in window){
+barcodeDetector=new BarcodeDetector({
+formats:['code_128','ean_13','ean_8']
+})
+}
+
+// OCR + BARCODE OKUMA
 const canvas=document.createElement("canvas")
 const ctx=canvas.getContext("2d")
-setInterval(()=>{
-if(video.readyState===video.HAVE_ENOUGH_DATA){
+
+setInterval(async()=>{
+
+if(video.readyState!==4)return
+
 canvas.width=video.videoWidth
 canvas.height=video.videoHeight
-ctx.drawImage(video,0,0,canvas.width,canvas.height)
-Tesseract.recognize(canvas,'eng',{logger:m=>console.log(m)})
-.then(({data:{text}})=>{
-const match=text.match(/\b\d{2}\.\d{2}\.\d{4}\b/)
+
+ctx.drawImage(video,0,0)
+
+
+// BARCODE VARSA ÇOK HIZLI OKUR
+if(barcodeDetector){
+
+let barcodes=await barcodeDetector.detect(canvas)
+
+if(barcodes.length>0){
+
+let code=barcodes[0].rawValue
+
+if(/\d{2}\.\d{2}\.\d{4}/.test(code)){
+document.getElementById("stokInput").value=code
+stokEkle()
+return
+}
+
+}
+
+}
+
+// OCR
+if(worker){
+
+let {data:{text}}=await worker.recognize(canvas)
+
+let match=text.match(/\d{2}\.\d{2}\.\d{4}/)
+
 if(match){
 document.getElementById("stokInput").value=match[0]
 stokEkle()
 }
-}).catch(()=>{})
+
 }
-},1000)
+
+},400) // eski 1000ms yerine 400ms (çok daha hızlı)
+
+
+// OTOMATİK FORMAT
+document.getElementById("stokInput").addEventListener("input",function(){
+
+let v=this.value.replace(/\D/g,"")
+
+if(v.length>2)v=v.slice(0,2)+"."+v.slice(2)
+if(v.length>5)v=v.slice(0,5)+"."+v.slice(5)
+
+this.value=v.slice(0,10)
+
+})
 
 </script>
+
 </body>
 </html>
