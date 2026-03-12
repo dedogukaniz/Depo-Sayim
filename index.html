@@ -1,28 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Depo Sayım – Hızlı Kamera OCR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Depo Sayım</title>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-body{font-family:Arial;padding:20px;background:#f5f5f5}
-select,input,button{display:block;margin:10px 0;padding:10px;width:260px;font-size:14px}
-table{border-collapse:collapse;width:100%;margin-top:20px;background:white}
-td,th{border:1px solid #ccc;padding:8px;text-align:center}
-th{background:#eee}
-#camera{width:100%;max-width:380px;border:1px solid #999;margin-top:10px}
+body{
+margin:0;
+padding:10px;
+font-family:Arial, sans-serif;
+background:#f2f2f2;
+font-size:24px;
+}
+
+video{
+width:100%;
+height:180px;
+object-fit:cover;
+border:2px solid #444;
+margin-bottom:10px;
+}
+
+label{
+font-weight:bold;
+display:block;
+margin-top:10px;
+}
+
+input,select,button{
+width:100%;
+padding:16px;
+margin-top:6px;
+margin-bottom:10px;
+font-size:24px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+button{
+background:#2e7d32;
+color:white;
+font-weight:bold;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+background:white;
+font-size:22px;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:12px;
+text-align:center;
+}
+
+th{
+background:#ddd;
+}
 </style>
 </head>
 
 <body>
 
-<h2>📦 Depo Sayım Sistemi</h2>
+<video id="camera" autoplay playsinline></video>
+
+<label>Raf No</label>
+<select id="raf"></select>
+
+<label>Stok Kodu</label>
+<input id="stok" placeholder="30.01.2121">
+
+<label>Adet</label>
+<input id="adet" type="number" value="1">
 
 <label>Kullanıcı</label>
-<select id="user">
+<select id="kullanici">
 <option>Ali</option>
 <option>İsmet</option>
 <option>İsa</option>
@@ -30,220 +88,122 @@ th{background:#eee}
 <option>Ersin</option>
 </select>
 
-<label>Raf</label>
-<select id="raf"></select>
-
-<label>Stok Kodu</label>
-<input type="text" id="stokInput" placeholder="30.01.2121" maxlength="10">
-
-<label>Adet</label>
-<input type="number" id="adetInput" value="1">
-
 <button onclick="stokEkle()">Stok Ekle</button>
-<button onclick="excelIndir()">Excel İndir (.xlsx)</button>
-
-<button onclick="kameraDegistir()">📷 Kamera Değiştir</button>
-
-<h3>Kamera</h3>
-<video id="camera" autoplay playsinline></video>
+<button onclick="excelIndir()">Excel İndir</button>
+<button onclick="kameraDegistir()">Kamera Değiş</button>
 
 <table>
 <thead>
 <tr>
-<th>Tarih</th>
-<th>Kullanıcı</th>
-<th>Raf</th>
-<th>Stok</th>
+<th>Stok No</th>
 <th>Adet</th>
+<th>Raf</th>
+<th>Kullanıcı</th>
+<th>Tarih</th>
 </tr>
 </thead>
-<tbody id="table"></tbody>
+<tbody id="liste"></tbody>
 </table>
 
 <script>
+let rafSelect=document.getElementById("raf")
 
-// RAF OLUŞTUR
-const raf=document.getElementById("raf")
 for(let r=1;r<=64;r++){
-for(let s=1;s<=5;s++){
-let opt=document.createElement("option")
-opt.value=`F${r}-${s}`
-opt.text=`F${r}-${s}`
-raf.appendChild(opt)
-}
+ for(let s=1;s<=5;s++){
+  let opt=document.createElement("option")
+  opt.value="F"+r+"-"+s
+  opt.text="F"+r+"-"+s
+  rafSelect.appendChild(opt)
+ }
 }
 
-// VERİ
-let data=[]
+let sonRaf=localStorage.getItem("sonRaf")
+if(sonRaf){
+ rafSelect.value=sonRaf
+}
 
-// STOK EKLE
+let veri=[]
+
 function stokEkle(){
+ let stok=document.getElementById("stok").value.trim()
+ let adet=parseInt(document.getElementById("adet").value)
+ let raf=document.getElementById("raf").value
+ let kullanici=document.getElementById("kullanici").value
+ let tarih=new Date().toLocaleString("tr-TR")
 
-let stok=document.getElementById("stokInput").value.trim()
-let adet=parseInt(document.getElementById("adetInput").value)
-let user=document.getElementById("user").value
-let rafv=document.getElementById("raf").value
+ if(stok==="") return
 
-if(!/^\d{2}\.\d{2}\.\d{4}$/.test(stok))return
+ veri.push({
+  stok:stok,
+  adet:adet,
+  raf:raf,
+  kullanici:kullanici,
+  tarih:tarih
+ })
 
-let today=new Date()
-let tarih=today.toLocaleDateString("tr-TR")
-
-let item=data.find(x=>x.stok==stok && x.raf==rafv)
-
-if(item){
-item.adet+=adet
-}else{
-data.push({tarih,user,raf:rafv,stok,adet})
+ localStorage.setItem("sonRaf",raf)
+ listeGuncelle()
+ document.getElementById("stok").value=""
 }
 
-updateTable()
+function listeGuncelle(){
+ let tbody=document.getElementById("liste")
+ tbody.innerHTML=""
 
-document.getElementById("stokInput").value=""
+ veri.forEach((item,index)=>{
+  let tr=document.createElement("tr")
+  tr.innerHTML=`
+  <td>${item.stok}</td>
+  <td onclick="adetDegistir(${index})">${item.adet}</td>
+  <td>${item.raf}</td>
+  <td>${item.kullanici}</td>
+  <td>${item.tarih}</td>
+  `
+  tbody.appendChild(tr)
+ })
 }
 
-// TABLO
-function updateTable(){
-
-let tbody=document.getElementById("table")
-tbody.innerHTML=""
-
-data.forEach(r=>{
-tbody.innerHTML+=`
-<tr>
-<td>${r.tarih}</td>
-<td>${r.user}</td>
-<td>${r.raf}</td>
-<td>${r.stok}</td>
-<td>${r.adet}</td>
-</tr>`
-})
-
+function adetDegistir(i){
+ let yeni=prompt("Yeni adet gir",veri[i].adet)
+ if(yeni!=null){
+  veri[i].adet=parseInt(yeni)
+  listeGuncelle()
+ }
 }
 
-// XLSX
 function excelIndir(){
-
-let ws=XLSX.utils.json_to_sheet(data)
-let wb=XLSX.utils.book_new()
-
-XLSX.utils.book_append_sheet(wb,ws,"Sayim")
-
-XLSX.writeFile(wb,"depo_sayim.xlsx")
-
+ let ws=XLSX.utils.json_to_sheet(veri)
+ let wb=XLSX.utils.book_new()
+ XLSX.utils.book_append_sheet(wb,ws,"Sayim")
+ let rafAdi=localStorage.getItem("sonRaf") || "sayim"
+ XLSX.writeFile(wb,rafAdi+".xlsx")
 }
 
-// KAMERA
 let video=document.getElementById("camera")
-let currentCamera="environment"
-let stream=null
+let stream
+let kamera="environment"
 
 async function kameraBaslat(){
+ if(stream){
+  stream.getTracks().forEach(track=>track.stop())
+ }
 
-if(stream){
-stream.getTracks().forEach(t=>t.stop())
-}
+ stream=await navigator.mediaDevices.getUserMedia({
+  video:{facingMode:kamera}
+ })
 
-stream=await navigator.mediaDevices.getUserMedia({
-video:{facingMode:currentCamera}
-})
-
-video.srcObject=stream
-
+ video.srcObject=stream
 }
 
 function kameraDegistir(){
-
-currentCamera=currentCamera==="environment"?"user":"environment"
-kameraBaslat()
-
+ kamera=kamera==="environment"?"user":"environment"
+ kameraBaslat()
 }
 
 kameraBaslat()
-
-// OCR WORKER (HIZLI)
-let worker=null
-
-async function ocrInit(){
-worker=await Tesseract.createWorker()
-await worker.loadLanguage('eng')
-await worker.initialize('eng')
-}
-
-ocrInit()
-
-// BARKOD DETECTOR
-let barcodeDetector=null
-
-if('BarcodeDetector' in window){
-barcodeDetector=new BarcodeDetector({
-formats:['code_128','ean_13','ean_8']
-})
-}
-
-// OCR + BARCODE OKUMA
-const canvas=document.createElement("canvas")
-const ctx=canvas.getContext("2d")
-
-setInterval(async()=>{
-
-if(video.readyState!==4)return
-
-canvas.width=video.videoWidth
-canvas.height=video.videoHeight
-
-ctx.drawImage(video,0,0)
-
-
-// BARCODE VARSA ÇOK HIZLI OKUR
-if(barcodeDetector){
-
-let barcodes=await barcodeDetector.detect(canvas)
-
-if(barcodes.length>0){
-
-let code=barcodes[0].rawValue
-
-if(/\d{2}\.\d{2}\.\d{4}/.test(code)){
-document.getElementById("stokInput").value=code
-stokEkle()
-return
-}
-
-}
-
-}
-
-// OCR
-if(worker){
-
-let {data:{text}}=await worker.recognize(canvas)
-
-let match=text.match(/\d{2}\.\d{2}\.\d{4}/)
-
-if(match){
-document.getElementById("stokInput").value=match[0]
-stokEkle()
-}
-
-}
-
-},400) // eski 1000ms yerine 400ms (çok daha hızlı)
-
-
-// OTOMATİK FORMAT
-document.getElementById("stokInput").addEventListener("input",function(){
-
-let v=this.value.replace(/\D/g,"")
-
-if(v.length>2)v=v.slice(0,2)+"."+v.slice(2)
-if(v.length>5)v=v.slice(0,5)+"."+v.slice(5)
-
-this.value=v.slice(0,10)
-
-})
-
 </script>
 
 </body>
 </html>
+
+
